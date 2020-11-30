@@ -852,6 +852,8 @@ HOOK_EXPORT HGLRC WINAPI wglGetCurrentContext()
 HOOK_EXPORT BOOL  WINAPI wglSwapBuffers(HDC hdc)
 {
 	static const auto trampoline = reshade::hooks::call(wglSwapBuffers);
+	if (*(unsigned int*)0x0000000140EDA810 != 2U)
+		return trampoline(hdc);
 
 	reshade::opengl::runtime_gl *runtime = g_current_runtime;
 	if (runtime == nullptr || 0 == runtime->_hdcs.count(hdc))
@@ -863,7 +865,7 @@ HOOK_EXPORT BOOL  WINAPI wglSwapBuffers(HDC hdc)
 	}
 
 	// The window handle can be invalid if the window was already destroyed
-	if (const HWND hwnd = WindowFromDC(hdc);
+	/*if (const HWND hwnd = WindowFromDC(hdc);
 		hwnd != nullptr && runtime != nullptr)
 	{
 		RECT rect = { 0, 0, 0, 0 };
@@ -884,10 +886,47 @@ HOOK_EXPORT BOOL  WINAPI wglSwapBuffers(HDC hdc)
 
 		// Assume that the correct OpenGL context is still current here
 		runtime->on_present();
-	}
+	}*/
 
 	return trampoline(hdc);
 }
+
+extern "C" __declspec(dllexport) int ReshadeRender() {
+	HWND hwnd = FindWindow(0, L"Hatsune Miku Project DIVA Arcade Future Tone");
+	if (hwnd == NULL) FindWindow(0, L"GLUT");
+	if (hwnd == NULL) FindWindow(0, L"FREEGLUT");
+	HDC hdc = GetDC(hwnd);
+
+	// Find the runtime that is associated with this device context
+	const auto it = std::find_if(s_opengl_runtimes.begin(), s_opengl_runtimes.end(),
+		[hdc](const std::pair<HGLRC, reshade::opengl::runtime_gl*>& it) { return it.second->_hdcs.count(hdc); });
+
+	// The window handle can be invalid if the window was already destroyed
+	if (hwnd != nullptr && it != s_opengl_runtimes.end())
+	{
+		RECT rect = { 0, 0, 0, 0 };
+		GetClientRect(hwnd, &rect);
+
+		const auto width = static_cast<unsigned int>(rect.right - rect.left);
+		const auto height = static_cast<unsigned int>(rect.bottom - rect.top);
+
+		if (width != it->second->frame_width() || height != it->second->frame_height())
+		{
+			LOG(INFO) << "Resizing runtime " << it->second << " on device context " << hdc << " to " << width << "x" << height << " ...";
+
+			it->second->on_reset();
+
+			if (!(width == 0 && height == 0) && !it->second->on_init(hwnd, width, height))
+				LOG(ERROR) << "Failed to recreate OpenGL runtime environment on runtime " << it->second << '.';
+		}
+
+		// Assume that the correct OpenGL context is still current here
+		it->second->on_present();
+
+	}
+	return 1;
+}
+
 HOOK_EXPORT BOOL  WINAPI wglSwapLayerBuffers(HDC hdc, UINT i)
 {
 	if (i != WGL_SWAP_MAIN_PLANE)
@@ -945,6 +984,8 @@ HOOK_EXPORT PROC  WINAPI wglGetProcAddress(LPCSTR lpszProc)
 
 	if (address == nullptr || lpszProc == nullptr)
 		return nullptr;
+	else if (0 == strcmp(lpszProc, "RenderReshade"))
+		{}
 	else if (0 == strcmp(lpszProc, "glBindTexture"))
 		return reinterpret_cast<PROC>(glBindTexture);
 	else if (0 == strcmp(lpszProc, "glBlendFunc"))

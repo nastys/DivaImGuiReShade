@@ -315,7 +315,8 @@ void reshade::opengl::runtime_gl::on_present()
 	// Copy depth from FBO to depth texture (and flip it vertically)
 	if (_copy_depth_source)
 	{
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, _depth_source == 0 ? 0 : _fbo[FBO_DEPTH_SRC]);
+		//glBindFramebuffer(GL_READ_FRAMEBUFFER, _depth_source == 0 ? 0 : _fbo[FBO_DEPTH_SRC]);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 3);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _fbo[FBO_DEPTH_DEST]);
 		glBlitFramebuffer(0, 0, _depth_source_width, _depth_source_height, 0, _depth_source_height, _depth_source_width, 0, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 	}
@@ -330,7 +331,8 @@ void reshade::opengl::runtime_gl::on_present()
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
 	glDrawBuffer(GL_BACK);
-	glBlitFramebuffer(0, 0, _width, _height, 0, _height, _width, 0, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	//glBlitFramebuffer(0, 0, _width, _height, 0, _height, _width, 0, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	glBlitFramebuffer(0, 0, *(int*)0x00000001411ABB50, *(int*)0x00000001411ABB54, 0, _height, _width, 0, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	_current_fbo = 0;
 
 	runtime::on_present();
